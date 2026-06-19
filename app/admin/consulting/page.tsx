@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -53,6 +53,14 @@ const empty: FormData = {
 }
 
 export default function ConsultingPage() {
+  return (
+    <Suspense>
+      <ConsultingContent />
+    </Suspense>
+  )
+}
+
+function ConsultingContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
