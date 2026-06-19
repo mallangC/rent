@@ -96,7 +96,10 @@ export default function ConsultingPage() {
     setTotal(count ?? 0)
   }
 
-  useEffect(() => { fetchList(page) }, [page])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchList(page)
+  }, [page])
 
   function openAdd() {
     setEditingId(null)
