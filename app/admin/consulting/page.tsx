@@ -71,6 +71,7 @@ export default function ConsultingPage() {
   const [filterStatus, setFilterStatus] = useState<string>(() => searchParams.get('status') ?? '')
   const [searchPhone, setSearchPhone] = useState('')
   const [searchName, setSearchName] = useState('')
+  const [searchType, setSearchType] = useState<'name' | 'phone'>('name')
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -213,20 +214,34 @@ export default function ConsultingPage() {
 
       {/* 필터 */}
       <div className="flex flex-wrap items-center gap-2">
-        <input
-          type="text"
-          value={searchName}
-          onChange={e => { setSearchName(e.target.value); setPage(0) }}
-          placeholder="이름 검색"
-          className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-900 outline-none focus:border-gray-400 w-32"
-        />
-        <input
-          type="text"
-          value={searchPhone}
-          onChange={e => { setSearchPhone(e.target.value); setPage(0) }}
-          placeholder="연락처 검색"
-          className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-900 outline-none focus:border-gray-400 w-36"
-        />
+        <div className="flex items-center border border-gray-200 rounded-md overflow-hidden">
+          <select
+            value={searchType}
+            onChange={e => {
+              const t = e.target.value as 'name' | 'phone'
+              setSearchType(t)
+              setSearchName('')
+              setSearchPhone('')
+              setPage(0)
+            }}
+            className="px-2 py-1.5 text-sm text-gray-600 bg-gray-50 border-r border-gray-200 outline-none"
+          >
+            <option value="name">이름</option>
+            <option value="phone">연락처</option>
+          </select>
+          <input
+            type="text"
+            value={searchType === 'name' ? searchName : searchPhone}
+            onChange={e => {
+              const v = e.target.value
+              if (searchType === 'name') { setSearchName(v); setSearchPhone('') }
+              else { setSearchPhone(v); setSearchName('') }
+              setPage(0)
+            }}
+            placeholder="검색"
+            className="px-3 py-1.5 text-sm text-gray-900 outline-none w-36 bg-white"
+          />
+        </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => { setFilterStatus(''); setPage(0); router.replace('/admin/consulting') }}
