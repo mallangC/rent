@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 const STATUSES = ['기본', '불량', '부재', '관리', '가망', '계약', '출고'] as const
@@ -24,6 +25,7 @@ type Consultation = {
   phone: string
   manager: string
   content: string
+  recall_date: string | null
   created_at: string
 }
 
@@ -47,9 +49,13 @@ const empty: FormData = {
   phone: '',
   manager: '',
   content: '',
+  recall_date: null,
 }
 
 export default function ConsultingPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
   const [list, setList] = useState<Consultation[]>([])
   const [page, setPage] = useState(0)
   const [total, setTotal] = useState(0)
@@ -62,6 +68,9 @@ export default function ConsultingPage() {
   const [statusDropdown, setStatusDropdown] = useState<string | null>(null)
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 })
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const [filterStatus, setFilterStatus] = useState<string>(() => searchParams.get('status') ?? '')
+  const [searchPhone, setSearchPhone] = useState('')
+  const [searchName, setSearchName] = useState('')
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -81,25 +90,29 @@ export default function ConsultingPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  async function fetchList(p: number) {
+  async function fetchList(p: number, status: string, phone: string, name: string) {
     const supabase = createClient()
     const from = p * PAGE_SIZE
     const to = from + PAGE_SIZE - 1
 
-    const { data, count } = await supabase
+    let query = supabase
       .from('consultations')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
-      .range(from, to)
 
+    if (status) query = query.eq('status', status)
+    if (phone) query = query.ilike('phone', `%${stripPhone(phone)}%`)
+    if (name) query = query.ilike('customer_name', `%${name}%`)
+
+    const { data, count } = await query.range(from, to)
     setList(data ?? [])
     setTotal(count ?? 0)
   }
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void fetchList(page)
-  }, [page])
+    void fetchList(page, filterStatus, searchPhone, searchName)
+  }, [page, filterStatus, searchPhone, searchName])
 
   function openAdd() {
     setEditingId(null)
@@ -118,6 +131,7 @@ export default function ConsultingPage() {
       phone: item.phone,
       manager: item.manager,
       content: item.content,
+      recall_date: item.recall_date,
     })
     setPhoneDisplay(formatPhone(item.phone))
     setError('')
@@ -162,7 +176,7 @@ export default function ConsultingPage() {
 
     closeForm()
     setPage(0)
-    await fetchList(0)
+    await fetchList(0, filterStatus, searchPhone, searchName)
     setLoading(false)
   }
 
@@ -177,7 +191,7 @@ export default function ConsultingPage() {
     if (!confirm('삭제하시겠습니까?')) return
     const supabase = createClient()
     await supabase.from('consultations').delete().eq('id', id)
-    await fetchList(page)
+    await fetchList(page, filterStatus, searchPhone, searchName)
   }
 
   const rows = [...list]
@@ -197,13 +211,48 @@ export default function ConsultingPage() {
         </button>
       </div>
 
+      {/* 필터 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="text"
+          value={searchName}
+          onChange={e => { setSearchName(e.target.value); setPage(0) }}
+          placeholder="이름 검색"
+          className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-900 outline-none focus:border-gray-400 w-32"
+        />
+        <input
+          type="text"
+          value={searchPhone}
+          onChange={e => { setSearchPhone(e.target.value); setPage(0) }}
+          placeholder="연락처 검색"
+          className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-900 outline-none focus:border-gray-400 w-36"
+        />
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => { setFilterStatus(''); setPage(0); router.replace('/admin/consulting') }}
+            className={`px-3 py-1 rounded-full text-xs transition-colors ${filterStatus === '' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+          >
+            전체
+          </button>
+          {STATUSES.map(s => (
+            <button
+              key={s}
+              onClick={() => { setFilterStatus(s); setPage(0); router.replace(`/admin/consulting?status=${s}`) }}
+              className={`px-3 py-1 rounded-full text-xs transition-colors ${filterStatus === s ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/70" onClick={closeForm} />
-          <form onSubmit={handleSubmit} className="relative z-10 bg-white rounded-xl shadow-xl p-6 w-full max-w-lg mx-4 space-y-4">
+          <div className="absolute inset-0 bg-black/70" />
+          <form onSubmit={handleSubmit} className="relative z-10 bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl mx-4 space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-gray-900">{editingId ? '상담 수정' : '상담 추가'}</p>
-              <button type="button" onClick={closeForm} className="text-gray-400 hover:text-gray-700 transition-colors text-lg leading-none">×</button>
+              <button type="button" onClick={closeForm} className="text-gray-400 hover:text-gray-700 transition-colors text-2xl leading-none">×</button>
             </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -237,7 +286,16 @@ export default function ConsultingPage() {
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">재상담 날짜</label>
+              <input
+                type="date"
+                value={form.recall_date ?? ''}
+                onChange={e => setForm(f => ({ ...f, recall_date: e.target.value || null }))}
+                className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 outline-none focus:border-gray-500"
+              />
+            </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">고객이름</label>
               <input
@@ -245,7 +303,7 @@ export default function ConsultingPage() {
                 onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))}
                 required
                 className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 outline-none focus:border-gray-500"
-                placeholder="홍길동"
+                placeholder="이름"
               />
             </div>
             <div>
@@ -267,20 +325,13 @@ export default function ConsultingPage() {
             <textarea
               value={form.content}
               onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
-              rows={6}
+              rows={10}
               className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 outline-none focus:border-gray-500 resize-none"
               placeholder="상담 내용을 입력하세요"
             />
           </div>
           {error && <p className="text-xs text-red-600">{error}</p>}
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={closeForm}
-              className="text-sm px-4 py-2 border border-gray-200 rounded hover:bg-gray-50 transition-colors"
-            >
-              취소
-            </button>
+          <div className="flex justify-end">
             <button
               type="submit"
               disabled={loading}
