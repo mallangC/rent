@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, Suspense } from 'react'
+import React, { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -186,9 +186,8 @@ function ConsultingContent() {
   }
 
   return (
-    <div className="flex gap-4 h-full min-h-0">
-      {/* 왼쪽: 고객 목록 */}
-      <div className={`flex flex-col gap-4 min-w-0 transition-all ${selectedGroup ? 'w-1/2' : 'w-full'}`}>
+    <div className="space-y-4">
+      <div className="flex flex-col gap-4">
 
         {/* 재상담 알림 */}
         {todayRecalls.length > 0 && (
@@ -262,6 +261,7 @@ function ConsultingContent() {
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 w-8"></th>
                 <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500">이름</th>
                 <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500">연락처</th>
                 <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500">담당자</th>
@@ -273,98 +273,95 @@ function ConsultingContent() {
             <tbody>
               {filteredGroups.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-400">
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-400">
                     상담 내역이 없습니다.
                   </td>
                 </tr>
               ) : (
-                filteredGroups.map(g => (
-                  <tr
-                    key={g.phone}
-                    onClick={() => setSelectedPhone(selectedPhone === g.phone ? null : g.phone)}
-                    className={`border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${selectedPhone === g.phone ? 'bg-blue-50 hover:bg-blue-50' : ''}`}
-                  >
-                    <td className="px-3 py-3 text-center text-gray-900 font-medium">{g.customer_name}</td>
-                    <td className="px-3 py-3 text-center text-gray-500 whitespace-nowrap">{formatPhone(g.phone)}</td>
-                    <td className="px-3 py-3 text-center text-gray-500">{g.manager}</td>
-                    <td className="px-3 py-3 text-center">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLE[g.latest.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                        {g.latest.status}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-center text-gray-500 whitespace-nowrap text-xs">
-                      {g.latest.recall_date ?? '-'}
-                    </td>
-                    <td className="px-3 py-3 text-center text-gray-500">{g.consultations.length}</td>
-                  </tr>
-                ))
+                filteredGroups.map(g => {
+                  const isOpen = selectedPhone === g.phone
+                  return (
+                    <React.Fragment key={g.phone}>
+                      <tr
+                        onClick={() => setSelectedPhone(isOpen ? null : g.phone)}
+                        className={`border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${isOpen ? 'bg-gray-50' : ''}`}
+                      >
+                        <td className="px-3 py-3 text-center">
+                          <svg
+                            className={`w-3.5 h-3.5 text-gray-400 mx-auto transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </td>
+                        <td className="px-3 py-3 text-center text-gray-900 font-medium">{g.customer_name}</td>
+                        <td className="px-3 py-3 text-center text-gray-500 whitespace-nowrap">{formatPhone(g.phone)}</td>
+                        <td className="px-3 py-3 text-center text-gray-500">{g.manager}</td>
+                        <td className="px-3 py-3 text-center">
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLE[g.latest.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                            {g.latest.status}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-center text-gray-500 whitespace-nowrap text-xs">
+                          {g.latest.recall_date ?? '-'}
+                        </td>
+                        <td className="px-3 py-3 text-center text-gray-500">{g.consultations.length}</td>
+                      </tr>
+                      {isOpen && (
+                        <tr key={`${g.phone}-detail`} className="border-b border-gray-100">
+                          <td colSpan={7} className="bg-gray-50 px-0 py-0">
+                            {/* 상담 추가 버튼 */}
+                            <div className="flex justify-end px-5 pt-3 pb-2">
+                              <button
+                                onClick={e => { e.stopPropagation(); setAddForm(emptyAdd); setShowAddModal(true) }}
+                                className="px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-700 transition-colors"
+                              >
+                                상담 추가
+                              </button>
+                            </div>
+                            {/* 상담 타임라인 */}
+                            <div className="divide-y divide-gray-200 border-t border-gray-200">
+                              {g.consultations.map((c, i) => (
+                                <div key={c.id} className="px-8 py-4">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-gray-400">
+                                        {new Date(c.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                      </span>
+                                      {i === 0 && (
+                                        <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-medium">최근</span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {c.recall_date && (
+                                        <span className={`text-xs ${c.recall_date === today ? 'text-amber-600 font-medium' : 'text-gray-400'}`}>
+                                          재상담 {c.recall_date}
+                                        </span>
+                                      )}
+                                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLE[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                        {c.status}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  {c.content ? (
+                                    <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{c.content}</p>
+                                  ) : (
+                                    <p className="text-sm text-gray-300 italic">내용 없음</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  )
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
-
-      {/* 오른쪽: 상담 이력 패널 */}
-      {selectedGroup && (
-        <div className="w-1/2 flex flex-col min-w-0">
-          <div className="bg-white border border-gray-200 rounded-lg flex flex-col overflow-hidden" style={{ maxHeight: 'calc(100vh - 80px)' }}>
-            {/* 고객 정보 헤더 */}
-            <div className="px-5 py-4 border-b border-gray-200 shrink-0">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base font-semibold text-gray-900">{selectedGroup.customer_name}</h2>
-                    <span className="text-sm text-gray-400">{formatPhone(selectedGroup.phone)}</span>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-0.5">담당자: {selectedGroup.manager} · 날짜: {selectedGroup.date}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => { setAddForm(emptyAdd); setShowAddModal(true) }}
-                    className="px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors whitespace-nowrap"
-                  >
-                    상담 추가
-                  </button>
-                  <button onClick={() => setSelectedPhone(null)} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
-                </div>
-              </div>
-            </div>
-
-            {/* 상담 타임라인 */}
-            <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
-              {selectedGroup.consultations.map((c, i) => (
-                <div key={c.id} className="px-5 py-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400">
-                        {new Date(c.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
-                      </span>
-                      {i === 0 && (
-                        <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-medium">최근</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {c.recall_date && (
-                        <span className={`text-xs ${c.recall_date === today ? 'text-amber-600 font-medium' : 'text-gray-400'}`}>
-                          재상담 {c.recall_date}
-                        </span>
-                      )}
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLE[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                        {c.status}
-                      </span>
-                    </div>
-                  </div>
-                  {c.content ? (
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{c.content}</p>
-                  ) : (
-                    <p className="text-sm text-gray-300 italic">내용 없음</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 신규 상담 모달 */}
       {showNewModal && (
