@@ -380,12 +380,12 @@ function ConsultingContent() {
               <div>
                 <label className="block text-xs text-gray-500 mb-1">날짜</label>
                 <input type="date" value={newForm.date} onChange={e => setNewForm(f => ({ ...f, date: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gray-400" />
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400" />
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">상태</label>
                 <select value={newForm.status} onChange={e => setNewForm(f => ({ ...f, status: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white">
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 bg-white">
                   {STATUSES.map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
@@ -393,7 +393,7 @@ function ConsultingContent() {
                 <label className="block text-xs text-gray-500 mb-1">담당자</label>
                 <input type="text" value={newForm.manager} onChange={e => setNewForm(f => ({ ...f, manager: e.target.value }))}
                   placeholder="담당자명"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gray-400" />
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 placeholder:text-gray-400" />
               </div>
             </div>
 
@@ -401,13 +401,13 @@ function ConsultingContent() {
               <div>
                 <label className="block text-xs text-gray-500 mb-1">재상담 날짜</label>
                 <input type="date" value={newForm.recall_date} onChange={e => setNewForm(f => ({ ...f, recall_date: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gray-400" />
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400" />
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">고객이름</label>
                 <input type="text" value={newForm.customer_name} onChange={e => setNewForm(f => ({ ...f, customer_name: e.target.value }))}
                   placeholder="이름"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gray-400" />
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 placeholder:text-gray-400" />
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">핸드폰번호</label>
@@ -418,14 +418,14 @@ function ConsultingContent() {
                     setNewForm(f => ({ ...f, phone: stripPhone(formatted) }))
                   }}
                   placeholder="010-0000-0000"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gray-400" />
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 placeholder:text-gray-400" />
               </div>
             </div>
 
             <div>
               <textarea value={newForm.content} onChange={e => setNewForm(f => ({ ...f, content: e.target.value }))}
                 rows={10} placeholder="상담 내용"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gray-400 resize-none" />
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 resize-none placeholder:text-gray-400" />
             </div>
 
             <button onClick={saveNew} disabled={saving || !newForm.customer_name || !newForm.phone}
@@ -453,21 +453,21 @@ function ConsultingContent() {
               <div>
                 <label className="block text-xs text-gray-500 mb-1">상태</label>
                 <select value={addForm.status} onChange={e => setAddForm(f => ({ ...f, status: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white">
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 bg-white">
                   {STATUSES.map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">재상담 날짜</label>
                 <input type="date" value={addForm.recall_date} onChange={e => setAddForm(f => ({ ...f, recall_date: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gray-400" />
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400" />
               </div>
             </div>
 
             <div>
               <textarea value={addForm.content} onChange={e => setAddForm(f => ({ ...f, content: e.target.value }))}
                 rows={8} placeholder="상담 내용"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gray-400 resize-none" />
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 resize-none placeholder:text-gray-400" />
             </div>
 
             <button onClick={saveAdd} disabled={saving}
