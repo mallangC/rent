@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, Suspense } from 'react'
+import React, { useEffect, useRef, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -99,6 +99,8 @@ function ConsultingContent() {
   const [filterStatus, setFilterStatus] = useState(searchParams.get('status') ?? '')
   const [searchType, setSearchType] = useState<'이름' | '연락처'>('이름')
   const [searchValue, setSearchValue] = useState('')
+  const [page, setPage] = useState(0)
+  const PAGE_SIZE = 15
 
   // 신규 상담 모달
   const [showNewModal, setShowNewModal] = useState(false)
@@ -110,6 +112,16 @@ function ConsultingContent() {
   const [showAddModal, setShowAddModal] = useState(false)
   const emptyAdd = { status: '기본', recall_date: '', content: '' }
   const [addForm, setAddForm] = useState(emptyAdd)
+
+  // 수정 모달
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState(emptyAdd)
+
+  // ... 옵션 드롭다운
+  const [optionsOpen, setOptionsOpen] = useState<string | null>(null)
+  const [optionsPos, setOptionsPos] = useState({ top: 0, left: 0 })
+  const optionsRef = useRef<HTMLDivElement>(null)
 
   const [saving, setSaving] = useState(false)
 
@@ -129,6 +141,53 @@ function ConsultingContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (optionsRef.current && !optionsRef.current.contains(e.target as Node)) {
+        setOptionsOpen(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  function openOptions(e: React.MouseEvent<HTMLButtonElement>, id: string) {
+    e.stopPropagation()
+    const rect = e.currentTarget.getBoundingClientRect()
+    setOptionsPos({ top: rect.bottom + window.scrollY + 4, left: rect.right + window.scrollX - 96 })
+    setOptionsOpen(prev => prev === id ? null : id)
+  }
+
+  function openEdit(c: Consultation) {
+    setEditingId(c.id)
+    setEditForm({ status: c.status, recall_date: c.recall_date ?? '', content: c.content })
+    setOptionsOpen(null)
+    setShowEditModal(true)
+  }
+
+  async function saveEdit() {
+    if (!editingId) return
+    setSaving(true)
+    const supabase = createClient()
+    await supabase.from('consultations').update({
+      status: editForm.status,
+      recall_date: editForm.recall_date || null,
+      content: editForm.content,
+    }).eq('id', editingId)
+    setSaving(false)
+    setShowEditModal(false)
+    setEditingId(null)
+    await fetchAll()
+  }
+
+  async function deleteConsultation(id: string) {
+    if (!confirm('이 상담을 삭제하시겠습니까?')) return
+    setOptionsOpen(null)
+    const supabase = createClient()
+    await supabase.from('consultations').delete().eq('id', id)
+    await fetchAll()
+  }
+
   const filteredGroups = customerGroups.filter(g => {
     if (filterStatus && g.latest.status !== filterStatus) return false
     if (searchValue) {
@@ -137,10 +196,10 @@ function ConsultingContent() {
     }
     return true
   })
+  const totalPages = Math.max(1, Math.ceil(filteredGroups.length / PAGE_SIZE))
+  const pagedGroups = filteredGroups.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
-  const todayRecalls = customerGroups.filter(g =>
-    g.consultations.some(c => c.recall_date === today)
-  )
+  const todayRecalls = customerGroups.filter(g => g.latest.recall_date === today)
 
   const selectedGroup = selectedPhone ? customerGroups.find(g => g.phone === selectedPhone) ?? null : null
 
@@ -191,19 +250,26 @@ function ConsultingContent() {
 
         {/* 재상담 알림 */}
         {todayRecalls.length > 0 && (
-          <div className="space-y-2">
-            {todayRecalls.map(g => (
-              <button
-                key={g.phone}
-                onClick={() => setSelectedPhone(g.phone)}
-                className="w-full text-left bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 flex items-center gap-2 hover:bg-amber-100 transition-colors"
-              >
-                <span className="text-sm">🔔</span>
-                <span className="text-sm text-amber-800">
-                  <span className="font-semibold">{g.customer_name}</span>님 재상담 날짜입니다.
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 flex items-start gap-2">
+            <span className="text-sm mt-0.5">🔔</span>
+            <div className="flex flex-wrap gap-x-1 text-sm text-amber-800">
+              {todayRecalls.map((g, i) => (
+                <span key={g.phone}>
+                  <button
+                    onClick={() => {
+                      const idx = filteredGroups.findIndex(fg => fg.phone === g.phone)
+                      if (idx !== -1) setPage(Math.floor(idx / PAGE_SIZE))
+                      setSelectedPhone(g.phone)
+                    }}
+                    className="font-semibold hover:underline"
+                  >
+                    {g.customer_name}
+                  </button>
+                  {i < todayRecalls.length - 1 ? ',' : ''}
                 </span>
-              </button>
-            ))}
+              ))}
+              <span>님 재상담 날짜입니다.</span>
+            </div>
           </div>
         )}
 
@@ -223,7 +289,7 @@ function ConsultingContent() {
           <div className="flex border border-gray-200 rounded-lg overflow-hidden bg-white">
             <select
               value={searchType}
-              onChange={e => { setSearchType(e.target.value as '이름' | '연락처'); setSearchValue('') }}
+              onChange={e => { setSearchType(e.target.value as '이름' | '연락처'); setSearchValue(''); setPage(0) }}
               className="px-2 py-1.5 text-sm text-gray-600 bg-gray-50 border-r border-gray-200 outline-none"
             >
               <option>이름</option>
@@ -232,14 +298,14 @@ function ConsultingContent() {
             <input
               type="text"
               value={searchValue}
-              onChange={e => setSearchValue(e.target.value)}
+              onChange={e => { setSearchValue(e.target.value); setPage(0) }}
               placeholder="검색"
               className="px-3 py-1.5 text-sm text-gray-900 outline-none w-36 bg-white"
             />
           </div>
           <div className="flex items-center gap-1 flex-wrap">
             <button
-              onClick={() => { setFilterStatus(''); router.replace('/admin/consulting') }}
+              onClick={() => { setFilterStatus(''); setPage(0); router.replace('/admin/consulting') }}
               className={`px-2.5 py-1 rounded-full text-xs transition-colors ${filterStatus === '' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
             >
               전체
@@ -247,7 +313,7 @@ function ConsultingContent() {
             {STATUSES.map(s => (
               <button
                 key={s}
-                onClick={() => { setFilterStatus(s); router.replace(`/admin/consulting?status=${s}`) }}
+                onClick={() => { setFilterStatus(s); setPage(0); router.replace(`/admin/consulting?status=${s}`) }}
                 className={`px-2.5 py-1 rounded-full text-xs transition-colors ${filterStatus === s ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
               >
                 {s}
@@ -268,17 +334,26 @@ function ConsultingContent() {
                 <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500">최근 상태</th>
                 <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500">재상담일</th>
                 <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500">상담수</th>
+                <th className="px-3 py-2.5 w-20"></th>
               </tr>
             </thead>
             <tbody>
               {filteredGroups.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-400">
-                    상담 내역이 없습니다.
-                  </td>
-                </tr>
+                <>
+                  <tr>
+                    <td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-400">
+                      상담 내역이 없습니다.
+                    </td>
+                  </tr>
+                  {Array.from({ length: PAGE_SIZE - 1 }).map((_, i) => (
+                    <tr key={`empty-${i}`} className="border-b border-gray-100">
+                      <td colSpan={8} className="h-[45px]" />
+                    </tr>
+                  ))}
+                </>
               ) : (
-                filteredGroups.map(g => {
+                <>
+                  {pagedGroups.map(g => {
                   const isOpen = selectedPhone === g.phone
                   return (
                     <React.Fragment key={g.phone}>
@@ -306,19 +381,18 @@ function ConsultingContent() {
                           {g.latest.recall_date ?? '-'}
                         </td>
                         <td className="px-3 py-3 text-center text-gray-500">{g.consultations.length}</td>
+                        <td className="px-3 py-3 text-center">
+                          <button
+                            onClick={e => { e.stopPropagation(); setSelectedPhone(g.phone); setAddForm(emptyAdd); setShowAddModal(true) }}
+                            className="px-2.5 py-1 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-700 transition-colors whitespace-nowrap"
+                          >
+                            상담 추가
+                          </button>
+                        </td>
                       </tr>
                       {isOpen && (
                         <tr key={`${g.phone}-detail`} className="border-b border-gray-100">
-                          <td colSpan={7} className="bg-gray-50 px-0 py-0">
-                            {/* 상담 추가 버튼 */}
-                            <div className="flex justify-end px-5 pt-3 pb-2">
-                              <button
-                                onClick={e => { e.stopPropagation(); setAddForm(emptyAdd); setShowAddModal(true) }}
-                                className="px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-700 transition-colors"
-                              >
-                                상담 추가
-                              </button>
-                            </div>
+                          <td colSpan={8} className="bg-gray-50 px-0 py-0">
                             {/* 상담 타임라인 */}
                             <div className="divide-y divide-gray-200 border-t border-gray-200">
                               {g.consultations.map((c, i) => (
@@ -341,6 +415,12 @@ function ConsultingContent() {
                                       <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLE[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
                                         {c.status}
                                       </span>
+                                      <button
+                                        onClick={e => openOptions(e, c.id)}
+                                        className="text-gray-400 hover:text-gray-700 px-1 leading-none text-base transition-colors"
+                                      >
+                                        ···
+                                      </button>
                                     </div>
                                   </div>
                                   {c.content ? (
@@ -356,10 +436,35 @@ function ConsultingContent() {
                       )}
                     </React.Fragment>
                   )
-                })
+                  })}
+                  {Array.from({ length: PAGE_SIZE - pagedGroups.length }).map((_, i) => (
+                    <tr key={`empty-${i}`} className="border-b border-gray-100">
+                      <td colSpan={8} className="h-[45px]" />
+                    </tr>
+                  ))}
+                </>
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* 페이지네이션 */}
+        <div className="flex items-center justify-center gap-2">
+          <button
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="px-3 py-1 text-sm border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-30 transition-colors"
+          >
+            이전
+          </button>
+          <span className="text-sm text-gray-500">{page + 1} / {totalPages}</span>
+          <button
+            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+            disabled={page >= totalPages - 1}
+            className="px-3 py-1 text-sm border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-30 transition-colors"
+          >
+            다음
+          </button>
         </div>
       </div>
 
@@ -472,6 +577,75 @@ function ConsultingContent() {
               {saving ? '저장 중...' : '저장'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* 수정 모달 */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/70" />
+          <div className="relative z-10 bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-base font-semibold text-gray-900">상담 수정</p>
+              <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">상태</label>
+                <select value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 bg-white">
+                  {STATUSES.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">재상담 날짜</label>
+                <input type="date" value={editForm.recall_date} onChange={e => setEditForm(f => ({ ...f, recall_date: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400" />
+              </div>
+            </div>
+
+            <div>
+              <textarea value={editForm.content} onChange={e => setEditForm(f => ({ ...f, content: e.target.value }))}
+                rows={8} placeholder="상담 내용"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 resize-none placeholder:text-gray-400" />
+            </div>
+
+            <button onClick={saveEdit} disabled={saving}
+              className="w-full py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors">
+              {saving ? '저장 중...' : '저장'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ··· 옵션 드롭다운 */}
+      {optionsOpen && (
+        <div
+          ref={optionsRef}
+          style={{ top: optionsPos.top, left: optionsPos.left }}
+          className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-24"
+        >
+          {(() => {
+            const target = customerGroups.flatMap(g => g.consultations).find(c => c.id === optionsOpen)
+            if (!target) return null
+            return (
+              <>
+                <button
+                  onClick={() => openEdit(target)}
+                  className="block w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  수정
+                </button>
+                <button
+                  onClick={() => deleteConsultation(target.id)}
+                  className="block w-full text-left px-3 py-1.5 text-sm text-red-500 hover:bg-gray-50 transition-colors"
+                >
+                  삭제
+                </button>
+              </>
+            )
+          })()}
         </div>
       )}
     </div>

@@ -40,6 +40,7 @@ type Stats = {
   contracted: number
   prospect: number
   delivered: number
+  todayRecall: number
   statusCounts: Record<string, number>
 }
 
@@ -50,6 +51,7 @@ export default function DashboardPage() {
     contracted: 0,
     prospect: 0,
     delivered: 0,
+    todayRecall: 0,
     statusCounts: {},
   })
   const [recents, setRecents] = useState<Consultation[]>([])
@@ -73,11 +75,28 @@ export default function DashboardPage() {
 
       const { data: customers } = await supabase.from('customers').select('id')
 
+      // 전화번호 기준으로 그룹핑해 최신 상담의 recall_date가 오늘인 고객 수
+      const today = new Date()
+      const todayStr = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, '0'),
+        String(today.getDate()).padStart(2, '0'),
+      ].join('-')
+      const latestByPhone = new Map<string, typeof consultations[0]>()
+      consultations.forEach(c => {
+        const existing = latestByPhone.get(c.phone)
+        if (!existing || new Date(c.created_at) > new Date(existing.created_at)) {
+          latestByPhone.set(c.phone, c)
+        }
+      })
+      const todayRecall = [...latestByPhone.values()].filter(c => c.recall_date === todayStr).length
+
       setStats({
         total: customers?.length ?? 0,
         contracted: statusCounts['계약'] ?? 0,
         prospect: statusCounts['가망'] ?? 0,
         delivered: statusCounts['출고'] ?? 0,
+        todayRecall,
         statusCounts,
       })
 
@@ -96,17 +115,18 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* 상단 4개 지표 */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* 상단 5개 지표 */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         {[
           { label: '전체고객', value: stats.total },
           { label: '계약고객', value: stats.contracted },
           { label: '가망고객', value: stats.prospect },
           { label: '출고완료', value: stats.delivered },
+          { label: '오늘 재상담', value: stats.todayRecall, highlight: stats.todayRecall > 0 },
         ].map(item => (
-          <div key={item.label} className="bg-white border border-gray-200 rounded-lg p-4">
-            <p className="text-xs text-gray-500">{item.label}</p>
-            <p className="text-2xl font-semibold text-gray-900 mt-1">{item.value}</p>
+          <div key={item.label} className={`border rounded-lg p-4 ${'highlight' in item && item.highlight ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}>
+            <p className={`text-xs ${'highlight' in item && item.highlight ? 'text-amber-600' : 'text-gray-500'}`}>{item.label}</p>
+            <p className={`text-2xl font-semibold mt-1 ${'highlight' in item && item.highlight ? 'text-amber-700' : 'text-gray-900'}`}>{item.value}</p>
           </div>
         ))}
       </div>
