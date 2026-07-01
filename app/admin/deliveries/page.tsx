@@ -10,7 +10,6 @@ type Delivery = {
   customer_name: string
   phone: string
   vehicle_price: number | null
-  acquisition_cost: number | null
   acquisition_rate: number | null
   ag_rate: number | null
   financial_company: string | null
@@ -45,7 +44,6 @@ const emptyForm = {
   phone: '',
   phoneDisplay: '',
   vehicle_price: '',
-  acquisition_cost: '',
   acquisition_rate: '',
   ag_rate: '',
   financial_company: '',
@@ -111,7 +109,6 @@ export default function DeliveriesPage() {
       phone: stripPhone(d.phone),
       phoneDisplay: formatPhone(d.phone),
       vehicle_price: d.vehicle_price != null ? d.vehicle_price.toLocaleString() : '',
-      acquisition_cost: d.acquisition_cost != null ? d.acquisition_cost.toLocaleString() : '',
       acquisition_rate: d.acquisition_rate != null ? String(d.acquisition_rate) : '',
       ag_rate: d.ag_rate != null ? String(d.ag_rate) : '',
       financial_company: d.financial_company ?? '',
@@ -130,7 +127,6 @@ export default function DeliveriesPage() {
       customer_name: form.customer_name,
       phone: stripPhone(form.phone),
       vehicle_price: parseNumber(form.vehicle_price),
-      acquisition_cost: parseNumber(form.acquisition_cost),
       acquisition_rate: parseNumber(form.acquisition_rate),
       ag_rate: parseNumber(form.ag_rate),
       financial_company: form.financial_company || null,
@@ -167,7 +163,7 @@ export default function DeliveriesPage() {
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   const isAdmin = profile?.role === '관리자'
-  const colCount = isAdmin ? 9 : 8
+  const colCount = isAdmin ? 8 : 7
 
   return (
     <div className="space-y-4">
@@ -216,7 +212,6 @@ export default function DeliveriesPage() {
               <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 whitespace-nowrap">고객명</th>
               <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 whitespace-nowrap">고객번호</th>
               <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 whitespace-nowrap">차량가</th>
-              <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 whitespace-nowrap">취득원가</th>
               <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 whitespace-nowrap">취득원가%</th>
               <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 whitespace-nowrap">AG%</th>
               <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 whitespace-nowrap">금융사</th>
@@ -247,9 +242,6 @@ export default function DeliveriesPage() {
                     <td className="px-3 py-3 text-center text-gray-500 whitespace-nowrap">{formatPhone(d.phone)}</td>
                     <td className="px-3 py-3 text-center text-gray-700 whitespace-nowrap">
                       {d.vehicle_price != null ? d.vehicle_price.toLocaleString() : '-'}
-                    </td>
-                    <td className="px-3 py-3 text-center text-gray-700 whitespace-nowrap">
-                      {d.acquisition_cost != null ? d.acquisition_cost.toLocaleString() : '-'}
                     </td>
                     <td className="px-3 py-3 text-center text-gray-500 whitespace-nowrap">
                       {d.acquisition_rate != null ? `${d.acquisition_rate}%` : '-'}
@@ -365,17 +357,7 @@ export default function DeliveriesPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">취득원가</label>
-                <input
-                  type="text"
-                  value={form.acquisition_cost}
-                  onChange={e => setForm(f => ({ ...f, acquisition_cost: formatNumber(e.target.value) }))}
-                  placeholder="0"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 placeholder:text-gray-400"
-                />
-              </div>
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">취득원가 %</label>
                 <div className="relative">

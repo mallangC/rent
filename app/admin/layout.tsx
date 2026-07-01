@@ -6,11 +6,14 @@ import { createClient } from '@/lib/supabase/client'
 import { ProfileContext } from './profile-context'
 import type { Profile } from './profile-context'
 
-const tabs = [
+const baseTabs = [
   { label: '대시보드', href: '/admin' },
   { label: '상담 관리', href: '/admin/consulting' },
   { label: '고객 관리', href: '/admin/customers' },
   { label: '출고 내역', href: '/admin/deliveries' },
+]
+const adminTabs = [
+  { label: '직원 관리', href: '/admin/staff' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -21,10 +24,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [setupName, setSetupName] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const [showInviteModal, setShowInviteModal] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviting, setInviting] = useState(false)
-  const [inviteResult, setInviteResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -50,25 +49,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       .single()
     setProfile(data as Profile)
     setSaving(false)
-  }
-
-  async function sendInvite() {
-    if (!inviteEmail.trim()) return
-    setInviting(true)
-    setInviteResult(null)
-    const res = await fetch('/api/invite', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: inviteEmail.trim() }),
-    })
-    const data = await res.json()
-    if (res.ok) {
-      setInviteResult({ ok: true, msg: '초대 이메일을 발송했습니다.' })
-      setInviteEmail('')
-    } else {
-      setInviteResult({ ok: false, msg: data.error ?? '오류가 발생했습니다.' })
-    }
-    setInviting(false)
   }
 
   async function handleLogout() {
@@ -122,7 +102,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
 
           <nav className="flex-1 px-3 py-4 space-y-1">
-            {tabs.map(tab => {
+            {[...baseTabs, ...(profile.role === '관리자' ? adminTabs : [])].map(tab => {
               const isActive = pathname === tab.href
               return (
                 <button
@@ -145,14 +125,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <p className="text-sm font-medium text-gray-900">{profile.name}</p>
               <p className="text-xs text-gray-400 mt-0.5">{profile.role}</p>
             </div>
-            {profile.role === '관리자' && (
-              <button
-                onClick={() => { setShowInviteModal(true); setInviteResult(null); setInviteEmail('') }}
-                className="w-full text-left px-3 py-2 rounded-md text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
-              >
-                직원 초대
-              </button>
-            )}
             <button
               onClick={handleLogout}
               className="w-full text-left px-3 py-2 rounded-md text-sm text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
@@ -167,38 +139,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </main>
       </div>
 
-      {showInviteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/70" onClick={() => setShowInviteModal(false)} />
-          <div className="relative z-10 bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-base font-semibold text-gray-900">직원 초대</p>
-              <button onClick={() => setShowInviteModal(false)} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
-            </div>
-            <p className="text-sm text-gray-400">초대할 직원의 이메일을 입력하면 초대 링크를 발송합니다.</p>
-            <input
-              type="email"
-              value={inviteEmail}
-              onChange={e => setInviteEmail(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && sendInvite()}
-              placeholder="이메일 주소"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-gray-400 placeholder:text-gray-400"
-            />
-            {inviteResult && (
-              <p className={`text-sm ${inviteResult.ok ? 'text-green-600' : 'text-red-500'}`}>
-                {inviteResult.msg}
-              </p>
-            )}
-            <button
-              onClick={sendInvite}
-              disabled={inviting || !inviteEmail.trim()}
-              className="w-full py-2.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors"
-            >
-              {inviting ? '발송 중...' : '초대 보내기'}
-            </button>
-          </div>
-        </div>
-      )}
     </ProfileContext.Provider>
   )
 }
