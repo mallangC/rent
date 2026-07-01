@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useProfile } from '../profile-context'
 
 const STATUSES = ['기본', '불량', '부재', '관리', '가망', '계약', '출고'] as const
 
@@ -91,12 +92,14 @@ export default function ConsultingPage() {
 function ConsultingContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const profile = useProfile()
   const today = localToday()
 
   const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null)
 
   const [filterStatus, setFilterStatus] = useState(searchParams.get('status') ?? '')
+  const [filterManager, setFilterManager] = useState('')
   const [searchType, setSearchType] = useState<'이름' | '연락처'>('이름')
   const [searchValue, setSearchValue] = useState('')
   const [page, setPage] = useState(0)
@@ -104,7 +107,7 @@ function ConsultingContent() {
 
   // 신규 상담 모달
   const [showNewModal, setShowNewModal] = useState(false)
-  const emptyNew = { date: today, status: '기본', customer_name: '', phone: '', manager: '', recall_date: '', content: '' }
+  const emptyNew = { date: today, status: '기본', customer_name: '', phone: '', manager: profile?.name ?? '', recall_date: '', content: '' }
   const [newForm, setNewForm] = useState(emptyNew)
   const [phoneDisplay, setPhoneDisplay] = useState('')
 
@@ -188,8 +191,11 @@ function ConsultingContent() {
     await fetchAll()
   }
 
+  const managers = [...new Set(customerGroups.map(g => g.manager).filter(Boolean))]
+
   const filteredGroups = customerGroups.filter(g => {
     if (filterStatus && g.latest.status !== filterStatus) return false
+    if (filterManager && g.manager !== filterManager) return false
     if (searchValue) {
       if (searchType === '이름' && !g.customer_name.includes(searchValue)) return false
       if (searchType === '연락처' && !g.phone.includes(stripPhone(searchValue))) return false
@@ -207,6 +213,8 @@ function ConsultingContent() {
     if (!newForm.customer_name || !newForm.phone) return
     setSaving(true)
     const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id
     const phone = stripPhone(newForm.phone)
     await supabase.from('consultations').insert({
       date: newForm.date || today,
@@ -216,8 +224,9 @@ function ConsultingContent() {
       manager: newForm.manager,
       recall_date: newForm.recall_date || null,
       content: newForm.content,
+      user_id: userId,
     })
-    await supabase.from('customers').upsert({ name: newForm.customer_name, phone }, { onConflict: 'phone', ignoreDuplicates: true })
+    await supabase.from('customers').upsert({ name: newForm.customer_name, phone, user_id: userId }, { onConflict: 'phone,user_id', ignoreDuplicates: true })
     setSaving(false)
     setShowNewModal(false)
     setNewForm(emptyNew)
@@ -229,6 +238,7 @@ function ConsultingContent() {
     if (!selectedGroup) return
     setSaving(true)
     const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('consultations').insert({
       date: selectedGroup.date,
       status: addForm.status,
@@ -237,6 +247,7 @@ function ConsultingContent() {
       manager: selectedGroup.manager,
       recall_date: addForm.recall_date || null,
       content: addForm.content,
+      user_id: user?.id,
     })
     setSaving(false)
     setShowAddModal(false)
@@ -277,20 +288,24 @@ function ConsultingContent() {
         <div className="flex items-center justify-between">
           <h1 className="text-base font-semibold text-gray-900">상담 관리</h1>
           <button
-            onClick={() => { setNewForm(emptyNew); setPhoneDisplay(''); setShowNewModal(true) }}
+            onClick={() => { setNewForm({ ...emptyNew, manager: profile?.name ?? '' }); setPhoneDisplay(''); setShowNewModal(true) }}
             className="px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors"
           >
             신규 상담
           </button>
         </div>
 
-        {/* 검색 · 상태 필터 */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex border border-gray-200 rounded-lg overflow-hidden bg-white">
+        {/* 검색 · 필터 */}
+        <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+          {/* 검색 */}
+          <div className="px-4 py-3 flex items-center gap-2">
+            <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            </svg>
             <select
               value={searchType}
               onChange={e => { setSearchType(e.target.value as '이름' | '연락처'); setSearchValue(''); setPage(0) }}
-              className="px-2 py-1.5 text-sm text-gray-600 bg-gray-50 border-r border-gray-200 outline-none"
+              className="text-sm text-gray-500 bg-transparent outline-none border-r border-gray-200 pr-2 mr-1"
             >
               <option>이름</option>
               <option>연락처</option>
@@ -299,27 +314,59 @@ function ConsultingContent() {
               type="text"
               value={searchValue}
               onChange={e => { setSearchValue(e.target.value); setPage(0) }}
-              placeholder="검색"
-              className="px-3 py-1.5 text-sm text-gray-900 outline-none w-36 bg-white"
+              placeholder="고객 검색"
+              className="flex-1 text-sm text-gray-900 outline-none placeholder:text-gray-400 bg-transparent"
             />
+            {searchValue && (
+              <button onClick={() => { setSearchValue(''); setPage(0) }} className="text-gray-300 hover:text-gray-500 text-lg leading-none">×</button>
+            )}
           </div>
-          <div className="flex items-center gap-1 flex-wrap">
-            <button
-              onClick={() => { setFilterStatus(''); setPage(0); router.replace('/admin/consulting') }}
-              className={`px-2.5 py-1 rounded-full text-xs transition-colors ${filterStatus === '' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-            >
-              전체
-            </button>
-            {STATUSES.map(s => (
+
+          {/* 상태 필터 */}
+          <div className="px-4 py-2.5 flex items-center gap-2">
+            <span className="text-xs text-gray-400 w-10 shrink-0">상태</span>
+            <div className="flex items-center gap-1 flex-wrap">
               <button
-                key={s}
-                onClick={() => { setFilterStatus(s); setPage(0); router.replace(`/admin/consulting?status=${s}`) }}
-                className={`px-2.5 py-1 rounded-full text-xs transition-colors ${filterStatus === s ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                onClick={() => { setFilterStatus(''); setPage(0); router.replace('/admin/consulting') }}
+                className={`px-2.5 py-1 rounded-full text-xs transition-colors ${filterStatus === '' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
               >
-                {s}
+                전체
               </button>
-            ))}
+              {STATUSES.map(s => (
+                <button
+                  key={s}
+                  onClick={() => { setFilterStatus(s); setPage(0); router.replace(`/admin/consulting?status=${s}`) }}
+                  className={`px-2.5 py-1 rounded-full text-xs transition-colors ${filterStatus === s ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* 담당자 필터 - 관리자만 */}
+          {profile?.role === '관리자' && managers.length > 0 && (
+            <div className="px-4 py-2.5 flex items-center gap-2">
+              <span className="text-xs text-gray-400 w-10 shrink-0">담당자</span>
+              <div className="flex items-center gap-1 flex-wrap">
+                <button
+                  onClick={() => { setFilterManager(''); setPage(0) }}
+                  className={`px-2.5 py-1 rounded-full text-xs transition-colors ${filterManager === '' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                  전체
+                </button>
+                {managers.map(m => (
+                  <button
+                    key={m}
+                    onClick={() => { setFilterManager(m); setPage(0) }}
+                    className={`px-2.5 py-1 rounded-full text-xs transition-colors ${filterManager === m ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 고객 목록 테이블 */}
@@ -330,7 +377,7 @@ function ConsultingContent() {
                 <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 w-8"></th>
                 <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500">이름</th>
                 <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500">연락처</th>
-                <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500">담당자</th>
+                {profile?.role === '관리자' && <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500">담당자</th>}
                 <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500">최근 상태</th>
                 <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500">재상담일</th>
                 <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500">상담수</th>
@@ -341,13 +388,13 @@ function ConsultingContent() {
               {filteredGroups.length === 0 ? (
                 <>
                   <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-400">
+                    <td colSpan={profile?.role === '관리자' ? 8 : 7} className="px-4 py-10 text-center text-sm text-gray-400">
                       상담 내역이 없습니다.
                     </td>
                   </tr>
                   {Array.from({ length: PAGE_SIZE - 1 }).map((_, i) => (
                     <tr key={`empty-${i}`} className="border-b border-gray-100">
-                      <td colSpan={8} className="h-[45px]" />
+                      <td colSpan={profile?.role === '관리자' ? 8 : 7} className="h-[45px]" />
                     </tr>
                   ))}
                 </>
@@ -371,7 +418,7 @@ function ConsultingContent() {
                         </td>
                         <td className="px-3 py-3 text-center text-gray-900 font-medium">{g.customer_name}</td>
                         <td className="px-3 py-3 text-center text-gray-500 whitespace-nowrap">{formatPhone(g.phone)}</td>
-                        <td className="px-3 py-3 text-center text-gray-500">{g.manager}</td>
+                        {profile?.role === '관리자' && <td className="px-3 py-3 text-center text-gray-500">{g.manager}</td>}
                         <td className="px-3 py-3 text-center">
                           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLE[g.latest.status] ?? 'bg-gray-100 text-gray-600'}`}>
                             {g.latest.status}
@@ -392,7 +439,7 @@ function ConsultingContent() {
                       </tr>
                       {isOpen && (
                         <tr key={`${g.phone}-detail`} className="border-b border-gray-100">
-                          <td colSpan={8} className="bg-gray-50 px-0 py-0">
+                          <td colSpan={profile?.role === '관리자' ? 8 : 7} className="bg-gray-50 px-0 py-0">
                             {/* 상담 타임라인 */}
                             <div className="divide-y divide-gray-200 border-t border-gray-200">
                               {g.consultations.map((c, i) => (
@@ -439,7 +486,7 @@ function ConsultingContent() {
                   })}
                   {Array.from({ length: PAGE_SIZE - pagedGroups.length }).map((_, i) => (
                     <tr key={`empty-${i}`} className="border-b border-gray-100">
-                      <td colSpan={8} className="h-[45px]" />
+                      <td colSpan={profile?.role === '관리자' ? 8 : 7} className="h-[45px]" />
                     </tr>
                   ))}
                 </>
@@ -478,7 +525,7 @@ function ConsultingContent() {
               <button onClick={() => setShowNewModal(false)} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">날짜</label>
                 <input type="date" value={newForm.date} onChange={e => setNewForm(f => ({ ...f, date: e.target.value }))}
@@ -490,12 +537,6 @@ function ConsultingContent() {
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 bg-white">
                   {STATUSES.map(s => <option key={s}>{s}</option>)}
                 </select>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">담당자</label>
-                <input type="text" value={newForm.manager} onChange={e => setNewForm(f => ({ ...f, manager: e.target.value }))}
-                  placeholder="담당자명"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 placeholder:text-gray-400" />
               </div>
             </div>
 
