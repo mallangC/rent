@@ -130,11 +130,15 @@ function ConsultingContent() {
 
   async function fetchAll() {
     const supabase = createClient()
-    const { data } = await supabase
-      .from('consultations')
-      .select('*')
-      .order('created_at', { ascending: false })
-    const rows = data ?? []
+    const [{ data: consultData }, { data: customerData }] = await Promise.all([
+      supabase.from('consultations').select('*').order('created_at', { ascending: false }),
+      supabase.from('customers').select('phone, name'),
+    ])
+    const nameByPhone = new Map((customerData ?? []).map(c => [c.phone, c.name]))
+    const rows = (consultData ?? []).map(c => ({
+      ...c,
+      customer_name: nameByPhone.get(c.phone) ?? c.customer_name,
+    }))
     setCustomerGroups(groupByPhone(rows))
   }
 
