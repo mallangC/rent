@@ -39,6 +39,9 @@ export default function StaffPage() {
   const [changingName, setChangingName] = useState(false)
   const [nameResult, setNameResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
+  // 역할 변경
+  const [changingRole, setChangingRole] = useState<string | null>(null)
+
   async function fetchStaff() {
     setLoading(true)
     try {
@@ -123,6 +126,21 @@ export default function StaffPage() {
     setNewName(member.name)
     setNameResult(null)
     setShowNameModal(true)
+  }
+
+  async function changeRole(member: StaffMember) {
+    const newRole = member.role === '관리자' ? '직원' : '관리자'
+    setChangingRole(member.id)
+    setOptionsOpen(null)
+    const res = await fetch('/api/staff/role', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: member.id, role: newRole }),
+    })
+    if (res.ok) {
+      setStaff(prev => prev.map(s => s.id === member.id ? { ...s, role: newRole as '관리자' | '직원' } : s))
+    }
+    setChangingRole(null)
   }
 
   async function changeName() {
@@ -227,6 +245,13 @@ export default function StaffPage() {
                   className="block w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   비밀번호 변경
+                </button>
+                <button
+                  onClick={() => void changeRole(target)}
+                  disabled={changingRole === target.id}
+                  className="block w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  {target.role === '관리자' ? '직원으로 변경' : '관리자로 변경'}
                 </button>
               </>
             )
