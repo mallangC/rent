@@ -41,10 +41,16 @@ export default function StaffPage() {
 
   async function fetchStaff() {
     setLoading(true)
-    const res = await fetch('/api/staff/list')
-    const data = await res.json()
-    setStaff(Array.isArray(data) ? data : [])
-    setLoading(false)
+    try {
+      const res = await fetch('/api/staff/list')
+      const data = await res.json()
+      setStaff(Array.isArray(data) ? data : [])
+    } catch (e) {
+      console.error('fetchStaff error:', e)
+      setStaff([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { void fetchStaff() }, [])
