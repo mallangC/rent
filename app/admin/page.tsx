@@ -67,15 +67,9 @@ export default function DashboardPage() {
 
       if (!consultations) return
 
-      const statusCounts: Record<string, number> = {}
-      STATUSES.forEach(s => { statusCounts[s] = 0 })
-      consultations.forEach(c => {
-        if (statusCounts[c.status] !== undefined) statusCounts[c.status]++
-      })
-
       const { data: customers } = await supabase.from('customers').select('id')
 
-      // 전화번호 기준으로 그룹핑해 최신 상담의 recall_date가 오늘인 고객 수
+      // 전화번호 기준 최신 상담만 추출
       const today = new Date()
       const todayStr = [
         today.getFullYear(),
@@ -89,7 +83,16 @@ export default function DashboardPage() {
           latestByPhone.set(c.phone, c)
         }
       })
-      const todayRecall = [...latestByPhone.values()].filter(c => c.recall_date === todayStr).length
+      const latestList = [...latestByPhone.values()]
+
+      // 최신 상담 기준으로 상태 집계
+      const statusCounts: Record<string, number> = {}
+      STATUSES.forEach(s => { statusCounts[s] = 0 })
+      latestList.forEach(c => {
+        if (statusCounts[c.status] !== undefined) statusCounts[c.status]++
+      })
+
+      const todayRecall = latestList.filter(c => c.recall_date === todayStr).length
 
       setStats({
         total: customers?.length ?? 0,
