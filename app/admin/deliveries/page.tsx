@@ -13,7 +13,7 @@ type Delivery = {
   acquisition_rate: number | null
   ag_rate: number | null
   financial_company: string | null
-  payout: number | null
+  notes: string | null
   user_id: string
   manager_name: string | null
 }
@@ -47,7 +47,7 @@ const emptyForm = {
   acquisition_rate: '',
   ag_rate: '',
   financial_company: '',
-  payout: '',
+  notes: '',
 }
 
 const PAGE_SIZE = 15
@@ -112,7 +112,7 @@ export default function DeliveriesPage() {
       acquisition_rate: d.acquisition_rate != null ? String(d.acquisition_rate) : '',
       ag_rate: d.ag_rate != null ? String(d.ag_rate) : '',
       financial_company: d.financial_company ?? '',
-      payout: d.payout != null ? d.payout.toLocaleString() : '',
+      notes: d.notes ?? '',
     })
     setOptionsOpen(null)
     setShowModal(true)
@@ -130,7 +130,7 @@ export default function DeliveriesPage() {
       acquisition_rate: parseNumber(form.acquisition_rate),
       ag_rate: parseNumber(form.ag_rate),
       financial_company: form.financial_company || null,
-      payout: parseNumber(form.payout),
+      notes: form.notes || null,
       user_id: user?.id,
       manager_name: profile?.name ?? null,
     }
@@ -164,6 +164,7 @@ export default function DeliveriesPage() {
 
   const isAdmin = profile?.role === '관리자'
   const colCount = isAdmin ? 8 : 7
+
 
   return (
     <div className="space-y-4">
@@ -215,7 +216,7 @@ export default function DeliveriesPage() {
               <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 whitespace-nowrap">취득원가%</th>
               <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 whitespace-nowrap">AG%</th>
               <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 whitespace-nowrap">금융사</th>
-              <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 whitespace-nowrap">나간돈</th>
+              <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 whitespace-nowrap">특이사항</th>
               {isAdmin && <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 whitespace-nowrap">담당자</th>}
               <th className="px-3 py-2.5 w-8"></th>
             </tr>
@@ -250,9 +251,7 @@ export default function DeliveriesPage() {
                       {d.ag_rate != null ? `${d.ag_rate}%` : '-'}
                     </td>
                     <td className="px-3 py-3 text-center text-gray-500 whitespace-nowrap">{d.financial_company ?? '-'}</td>
-                    <td className="px-3 py-3 text-center text-gray-700 whitespace-nowrap">
-                      {d.payout != null ? d.payout.toLocaleString() : '-'}
-                    </td>
+                    <td className="px-3 py-3 text-gray-500 max-w-[160px] truncate">{d.notes ?? '-'}</td>
                     {isAdmin && (
                       <td className="px-3 py-3 text-center text-gray-500 whitespace-nowrap text-xs">
                         {d.manager_name ?? '-'}
@@ -387,13 +386,13 @@ export default function DeliveriesPage() {
             </div>
 
             <div>
-              <label className="block text-xs text-gray-500 mb-1">나간돈</label>
-              <input
-                type="text"
-                value={form.payout}
-                onChange={e => setForm(f => ({ ...f, payout: formatNumber(e.target.value) }))}
-                placeholder="0"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 placeholder:text-gray-400"
+              <label className="block text-xs text-gray-500 mb-1">특이사항</label>
+              <textarea
+                value={form.notes}
+                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                rows={6}
+                placeholder="특이사항을 입력하세요"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 resize-none placeholder:text-gray-400"
               />
             </div>
 
